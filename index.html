@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TenderRadar — EU Tender Intelligence</title>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:1050px;margin:0 auto;padding:24px;background:#f6f7f9;color:#17202a}
+    .hero,.panel{background:white;border:1px solid #e2e5e9;border-radius:16px;padding:22px;margin-bottom:18px}
+    h1{margin:0 0 8px}.muted{color:#68727d}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    label{font-size:13px;font-weight:700;display:block;margin-bottom:6px}input,select,button{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #ccd2d8;font-size:15px}
+    button{cursor:pointer;background:#17202a;color:#fff;border:0;font-weight:700}.status{margin:12px 0}.card{padding:17px 0;border-top:1px solid #e5e7eb}.card:first-child{border-top:0}
+    .top{display:flex;justify-content:space-between;gap:10px}.score{font-weight:800}.meta{font-size:13px;color:#5f6872;margin:7px 0}.value{font-weight:700}.link{display:inline-block;margin-top:8px;text-decoration:none;font-weight:700}
+    @media(max-width:700px){.grid{grid-template-columns:1fr}.top{display:block}}
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <h1>TenderRadar</h1>
+    <div class="muted">Find EU tenders that matter to you — without searching TED every day.</div>
+  </section>
+
+  <section class="panel">
+    <div class="grid">
+      <div><label>CPV area</label><input id="cpv" placeholder="e.g. 72000000 (IT services)"></div>
+      <div><label>Country</label><select id="country"><option value="">Any buyer country</option><option value="DE">Germany</option><option value="FR">France</option><option value="IT">Italy</option><option value="ES">Spain</option><option value="NL">Netherlands</option><option value="BE">Belgium</option><option value="AT">Austria</option><option value="SE">Sweden</option><option value="PL">Poland</option><option value="PT">Portugal</option><option value="IE">Ireland</option></select></div>
+      <div><label>Minimum value (€)</label><input id="minValue" type="number" min="0" value="0"></div>
+    </div>
+    <div style="margin-top:12px"><button onclick="searchTenders()">Search live TED tenders</button></div>
+    <div id="status" class="status muted"></div>
+  </section>
+
+  <section class="panel">
+    <div id="results"><div class="muted">Your results will appear here.</div></div>
+  </section>
+
+<script>
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+function money(v,c){if(v===null||v===undefined)return 'Not specified';return new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(v)+' '+(c||'');}
+async function searchTenders(){
+  const cpv=document.getElementById('cpv').value.trim();
+  const country=document.getElementById('country').value;
+  const min=document.getElementById('minValue').value||0;
+  const status=document.getElementById('status'); const results=document.getElementById('results');
+  status.textContent='Searching TED…'; results.innerHTML='';
+  const qs=new URLSearchParams({min_value:min,limit:'20'}); if(cpv)qs.set('cpv',cpv); if(country)qs.set('country',country);
+  try{
+    const r=await fetch('/api/tenders?'+qs.toString()); const data=await r.json();
+    if(!data.ok){status.textContent='Error: '+data.error; results.innerHTML='<div class="muted">'+esc(data.detail||'')+'</div>';return;}
+    status.textContent=`${data.count} result(s) returned from TED.`;
+    if(!data.notices.length){results.innerHTML='<div class="muted">No matching notices in this first search window. Try a broader CPV or country filter.</div>';return;}
+    results.innerHTML=data.notices.map(n=>`<article class="card">
+      <div class="top"><strong>${esc(n.title)}</strong><span class="score">${n.match_score}% match</span></div>
+      <div class="meta">Buyer: ${esc(n.buyer)} · Country: ${esc(n.country)} · Published: ${esc(n.publication_date||'—')}</div>
+      <div class="meta">Deadline: ${esc(n.deadline||'—')} · Value: <span class="value">${esc(money(n.estimated_value,n.currency))}</span></div>
+      <div class="meta">CPV: ${esc((n.cpv||[]).join(', ')||'—')} · Type: ${esc(n.notice_type||'—')}</div>
+      <a class="link" href="${esc(n.source_url)}" target="_blank" rel="noopener">Open official TED notice →</a>
+    </article>`).join('');
+  }catch(e){status.textContent='Connection error';results.innerHTML='<div class="muted">'+esc(e.message)+'</div>';}
+}
+</script>
+</body>
+</html>
