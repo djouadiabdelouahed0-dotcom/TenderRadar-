@@ -195,7 +195,14 @@ def search_tenders(
         raw_results = raw_results.get("results") or raw_results.get("notices") or []
 
     notices = [_normalise_notice(x) for x in raw_results if isinstance(x, dict)]
-    notices = [x for x in notices if (x["estimated_value"] is None or x["estimated_value"] >= min_value)]
+    # When the user sets a minimum value, exclude notices whose value is unknown.
+    # Otherwise, an unknown value could incorrectly pass a financial threshold.
+    if min_value > 0:
+        notices = [
+            x for x in notices
+            if x["estimated_value"] is not None
+            and x["estimated_value"] >= min_value
+        ]
     for notice in notices:
         notice["match_score"] = _score(notice, cpv, country3)
 
